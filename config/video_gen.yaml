@@ -1,0 +1,112 @@
+# =============================================================================
+# Cấu hình module video_gen
+#
+# Hợp đồng của file này nằm ở modules/video_gen/config.py -- gõ sai tên khoá sẽ
+# bị báo lỗi ngay lúc khởi động, không âm thầm bỏ qua.
+# Dùng ${TEN_BIEN} để lấy giá trị từ file .env.
+# =============================================================================
+
+# flow_browser  = điều khiển Chrome trên labs.google/fx/tools/flow,
+#                 tiêu credit gói Google AI Pro của bạn.  <-- đang dùng
+# gemini_api    = gọi Veo qua Gemini API, cần bật thanh toán riêng.
+backend: flow_browser
+
+# Các file prompt sẽ nạp, theo thứ tự. id trùng nhau -> file sau thắng.
+prompt_files:
+  - config/prompts/demo.yaml
+
+# --- Tham số mặc định cho mọi prompt -----------------------------------------
+# Từng prompt trong file prompts có thể ghi đè bất kỳ khoá nào dưới đây.
+defaults:
+  model: "veo-3.1"
+  aspect_ratio: "16:9"       # 16:9 | 9:16 | 1:1
+  resolution: "1080p"        # 720p | 1080p
+  duration_seconds: 8
+  outputs_per_prompt: 1      # 1..4. Tăng lên là nhân số credit tiêu thụ.
+  negative_prompt: null
+  seed: null
+
+  # Nối vào đầu/cuối MỌI prompt -- nơi đặt phong cách chung của cả batch.
+  # Để trống nếu bạn muốn prompt được giữ nguyên từng chữ.
+  prompt_prefix: ""
+  prompt_suffix: ""
+
+# --- Tài khoản & mức độ song song ---------------------------------------------
+execution:
+  accounts_file: config/accounts.yaml
+
+  # Số tài khoản chạy đồng thời.
+  #   1  = tuần tự. VẪN tự chuyển sang tài khoản khác khi hết credit.
+  #   >1 = song song thật: mỗi worker một tài khoản, một cửa sổ Chrome riêng.
+  # Số worker chạy thật = min(max_parallel, số tài khoản đang bật).
+  # Đặt lớn hơn số tài khoản không nhanh hơn: phía Google mỗi tài khoản chỉ có
+  # MỘT hàng đợi render, nên trục song song hoá là tài khoản chứ không phải prompt.
+  max_parallel: 1
+
+  # Nghỉ giữa hai prompt trong cùng một worker.
+  delay_between_specs_s: 2
+
+  # Một prompt được chuyển sang tài khoản khác tối đa bao nhiêu lần khi gặp lỗi
+  # hết credit. Bỏ trống (null) = đúng bằng số tài khoản, tức thử hết một lượt.
+  max_account_switches_per_spec: null
+
+# --- Nơi lưu kết quả ----------------------------------------------------------
+output:
+  root: output/video_gen
+  filename_template: "{spec_id}_{index:02d}.mp4"
+  # Sổ ghi prompt nào đã xong. Xoá file này = buộc sinh lại toàn bộ.
+  state_file: output/video_gen/_state.json
+
+# --- Thử lại khi gặp lỗi tạm thời ---------------------------------------------
+retry:
+  attempts: 3          # tổng số lần thử, kể cả lần đầu
+  base_delay_s: 5
+  max_delay_s: 120
+
+# --- Backend trình duyệt ------------------------------------------------------
+browser:
+  # URL mặc định, dùng cho tài khoản nào không khai `workspace_url` riêng trong
+  # config/accounts.yaml.
+  workspace_url: "https://labs.google/fx/tools/flow"
+  # KHUYẾN NGHỊ MẠNH: tạo sẵn một project trên Flow, chỉnh model/tỉ lệ khung hình
+  # bằng tay một lần, rồi dán URL project đó vào đây. Flow nhớ cài đặt theo từng
+  # project, nhờ vậy automation chỉ còn phải làm ba việc đơn giản nhất:
+  # gõ prompt -> chờ -> tải về.
+  # Ví dụ: "https://labs.google/fx/tools/flow/project/abc123"
+  # Có nhiều tài khoản thì mỗi tài khoản một project -- khai trong accounts.yaml.
+
+  browser_channel: chrome   # chrome | msedge | chromium
+                            # 'chrome' (Chrome thật) ít bị Google chặn đăng nhập nhất.
+  headless: false           # Lần chạy đầu để false để nhìn tận mắt nó làm gì.
+  slow_mo_ms: 0             # Đặt 300-500 khi cần quan sát chậm để gỡ lỗi.
+  viewport_width: 1600
+  viewport_height: 1000
+  locale: "en-US"           # Giữ tiếng Anh: selector bám theo nhãn tiếng Anh.
+
+  generation_timeout_s: 900 # Tối đa 15 phút cho một lượt render.
+  poll_interval_s: 3
+  element_timeout_ms: 15000
+
+  # Clip mới xuất hiện ở ĐẦU hay CUỐI danh sách kết quả?
+  # Đặt sai -> tải nhầm clip cũ. Xác nhận bằng mắt ở lần chạy đầu (headless: false).
+  results_order: newest_last   # newest_last | newest_first
+
+  # false = tin vào cài đặt bạn đã chọn sẵn trên UI (ổn định hơn nhiều).
+  # true  = cố chỉnh model/tỉ lệ qua bảng settings mỗi lần chạy (dễ vỡ khi đổi UI).
+  apply_settings_in_ui: false
+
+  save_debug_artifacts: true
+  selectors_file: config/flow_selectors.yaml
+
+# --- Backend Gemini API (chưa dùng, để sẵn cho sau này) -----------------------
+gemini_api:
+  api_key: "${GEMINI_API_KEY:-}"
+  model_id: "veo-3.1-generate-preview"
+  poll_interval_s: 10
+  generation_timeout_s: 900
+  person_generation: allow_all
+
+# --- Hành vi chung ------------------------------------------------------------
+# true = prompt đã sinh xong ở lần chạy trước thì bỏ qua. Đây là cơ chế tiết
+# kiệm credit quan trọng nhất; chỉ tắt khi bạn thật sự muốn render lại tất cả.
+resume: true

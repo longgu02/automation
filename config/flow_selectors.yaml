@@ -1,0 +1,144 @@
+# =============================================================================
+# Bản đồ selector cho giao diện Google Flow
+#
+# ĐÂY LÀ FILE DUY NHẤT BẠN CẦN SỬA KHI GOOGLE ĐỔI GIAO DIỆN.
+#
+# Mỗi khoá là một danh sách ứng viên, thử LẦN LƯỢT TỪ TRÊN XUỐNG cho tới khi có
+# cái nhìn thấy được. Xếp theo độ bền giảm dần:
+#
+#   1. role=...     bám vào vai trò ARIA + nhãn hiển thị -- bền nhất
+#   2. :has-text()  bám vào chữ người dùng nhìn thấy
+#   3. [aria-label] khá ổn định
+#   4. CSS class    dễ vỡ nhất (Google sinh class ngẫu nhiên) -- để cuối cùng
+#
+# CẢNH BÁO TRUNG THỰC: danh sách dưới đây được viết theo cấu trúc giao diện Flow
+# tại thời điểm dựng module, KHÔNG được kiểm chứng trực tiếp trên tài khoản của
+# bạn. Hãy coi nó là điểm khởi đầu. Lần chạy đầu tiên hãy dùng:
+#
+#     python scripts/inspect_flow.py
+#
+# script đó mở Flow và in ra selector thật của các phần tử bạn bấm vào.
+# Xem thêm README, mục "Khi Google đổi giao diện".
+#
+# Cú pháp là selector của Playwright, trộn nhiều engine thoải mái.
+# Chuỗi có {value} sẽ được điền lúc chạy (dùng cho các lựa chọn trong settings).
+# =============================================================================
+
+# --- Nhận diện trạng thái đăng nhập -------------------------------------------
+signin_button:
+  - 'role=button[name="Sign in"i]'
+  - 'role=link[name="Sign in"i]'
+  - 'button:has-text("Sign in")'
+  - 'a:has-text("Sign in")'
+
+# Hộp thoại chào mừng / giới thiệu tính năng. Không có cũng không sao.
+dismiss_dialog_button:
+  - 'role=button[name="Got it"i]'
+  - 'button:has-text("Got it")'
+  - 'button:has-text("Continue")'
+  - 'button:has-text("Skip")'
+  - 'button[aria-label="Close"i]'
+
+accept_cookies_button:
+  - 'button:has-text("Accept all")'
+  - 'button:has-text("I agree")'
+
+# --- Ô nhập prompt và nút gửi -------------------------------------------------
+# Sự hiện diện của ô này cũng chính là dấu hiệu "đã đăng nhập thành công".
+prompt_input:
+  - 'textarea[placeholder*="Generate a video"i]'
+  - 'textarea[placeholder*="prompt"i]'
+  - 'textarea[placeholder*="describe"i]'
+  - 'role=textbox[name="prompt"i]'
+  - 'div[contenteditable="true"]'
+  - 'textarea'
+
+submit_button:
+  - 'role=button[name="Generate"i]'
+  - 'button[aria-label*="Generate"i]'
+  - 'button[aria-label*="Send"i]'
+  - 'button[aria-label*="Create"i]'
+  - 'button:has-text("arrow_forward")'
+  - 'button[type="submit"]'
+
+reference_image_input:
+  - 'input[type="file"]'
+
+# --- Thẻ kết quả --------------------------------------------------------------
+# result_card_ready phải khớp CHÍNH XÁC những clip ĐÃ RENDER XONG (có thẻ <video>),
+# không tính ô trống đang quay vòng chờ. Backend đếm số thẻ này để biết khi nào
+# xong -- nên đây là selector quan trọng nhất trong cả file.
+result_card_ready:
+  - 'div[data-testid*="clip"i]:has(video)'
+  - 'div[class*="clip"i]:has(video)'
+  - 'div[role="listitem"]:has(video)'
+  - 'div:has(> video)'
+  - 'video'
+
+# Nút ba chấm / menu trên mỗi thẻ clip. Tìm BÊN TRONG thẻ, không phải toàn trang.
+card_menu_button:
+  - 'button[aria-label*="More"i]'
+  - 'button[aria-label*="options"i]'
+  - 'button[aria-label*="menu"i]'
+  - 'button:has-text("more_vert")'
+  - 'button[aria-label*="Download"i]'
+
+download_menu_item:
+  - 'role=menuitem[name="Download"i]'
+  - '[role="menuitem"]:has-text("Download")'
+  - 'button:has-text("Download")'
+  - 'text=Download'
+
+# Bước chọn chất lượng khi tải (nếu UI có hỏi). Không có thì bỏ qua.
+download_quality_option:
+  - '[role="menuitem"]:has-text("Original")'
+  - '[role="menuitem"]:has-text("1080p")'
+  - '[role="menuitem"]:has-text("720p")'
+  - 'text=Original size'
+
+# --- Thông báo lỗi ------------------------------------------------------------
+# Được đọc trong lúc chờ render để bỏ cuộc sớm thay vì ngồi hết 15 phút.
+error_message:
+  - '[role="alert"]'
+  - 'div[class*="toast"i]:visible'
+  - 'div[class*="snackbar"i]:visible'
+  - 'div[class*="error"i]:visible'
+
+# --- Bảng cài đặt -------------------------------------------------------------
+# Chỉ dùng khi browser.apply_settings_in_ui = true. Mặc định là false, nên các
+# selector dưới đây không nằm trên đường chạy chính.
+settings_button:
+  - 'button[aria-label*="Settings"i]'
+  - 'button[aria-label*="tune"i]'
+  - 'button:has-text("tune")'
+
+settings_close_button:
+  - 'button[aria-label="Close"i]'
+  - 'role=button[name="Done"i]'
+
+model_selector:
+  - 'button:has-text("Veo")'
+  - '[aria-label*="model"i]'
+
+model_option:
+  - '[role="option"]:has-text("{value}")'
+  - '[role="menuitem"]:has-text("{value}")'
+  - 'text={value}'
+
+aspect_ratio_selector:
+  - '[aria-label*="aspect"i]'
+  - 'button:has-text("16:9")'
+
+aspect_ratio_option:
+  - '[role="option"]:has-text("{value}")'
+  - '[role="menuitem"]:has-text("{value}")'
+  - 'text={value}'
+
+outputs_per_prompt_selector:
+  - '[aria-label*="outputs"i]'
+  - '[aria-label*="number of"i]'
+
+outputs_per_prompt_option:
+  - '[role="option"]:has-text("{value}")'
+  - '[role="menuitem"]:has-text("{value}")'
+  - 'text={value}'

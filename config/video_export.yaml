@@ -1,0 +1,99 @@
+# =============================================================================
+# Cấu hình module video_export -- ghép nhiều clip thành MỘT file video
+#
+# Hợp đồng của file này ở modules/video_export/config.py. Gõ sai tên khoá sẽ bị
+# báo lỗi ngay lúc khởi động.
+#
+# Xem trước mà không tốn thời gian mã hoá:
+#     python scripts/run_video_export.py --dry-run
+# Nó in ra đúng từng lệnh ffmpeg sẽ chạy.
+# =============================================================================
+
+# --- Lấy clip ở đâu, ghép theo thứ tự nào -------------------------------------
+sources:
+  # true = khi chạy trong một job, nhận danh sách clip từ module video_gen.
+  from_shared: true
+
+  # Dùng khi chạy độc lập (không có module trước). Mẫu glob, tính từ gốc project.
+  scan:
+    - "output/video_gen/*/*.mp4"
+
+  # THỨ TỰ GHÉP CHÍNH LÀ THỨ TỰ CẢNH trong video cuối -- để ý khoá này.
+  #   pipeline : giữ nguyên thứ tự video_gen đưa sang = thứ tự bạn khai prompt.
+  #              Chạy độc lập thì tự rơi về filename (có ghi rõ trong log).
+  #   filename : sắp theo tên file a-z.
+  #   explicit : theo đúng danh sách order_explicit bên dưới.
+  order: pipeline
+
+  # Chỉ dùng khi order = explicit. Mỗi mục khớp theo chuỗi con của tên file,
+  # nên viết spec_id là đủ. Clip không khớp mục nào sẽ bị loại.
+  order_explicit: []
+  #   - bien-hoang-hon
+  #   - pho-dem-mua
+  #   - san-pham-xoay
+
+  # Loại clip có đường dẫn chứa bất kỳ chuỗi nào trong đây.
+  exclude: []
+
+# --- Khung hình đích ----------------------------------------------------------
+# Mọi clip lệch tỉ lệ đều được đưa về khung này.
+video:
+  target_aspect_ratio: "16:9"    # 16:9 | 9:16 | 1:1 | 4:5 | 4:3
+  target_resolution: "1080p"     # con số là CẠNH NGẮN:
+                                 #   16:9 1080p -> 1920x1080
+                                 #   9:16 1080p -> 1080x1920
+                                 #   1:1  1080p -> 1080x1080
+  # target_size: "1920x1080"     # ghi đè trực tiếp nếu cần kích thước lạ
+
+  # letterbox = thu nhỏ vừa khung rồi thêm viền -> KHÔNG mất hình, có viền đen
+  # crop      = phóng cho kín khung rồi cắt phần thừa -> kín khung, MẤT rìa hình
+  fit: letterbox
+  pad_color: black
+
+  fps: null                      # null = lấy fps của clip đầu tiên
+
+# --- Mã hoá -------------------------------------------------------------------
+encode:
+  # auto   = nối byte nếu mọi clip đã đồng nhất và đúng khung đích (vài giây,
+  #          không mất chất lượng); ngược lại tự chuẩn hoá. Gần như luôn đúng ý.
+  # always = luôn mã hoá lại.
+  # never  = chỉ nối byte; clip lệch nhau thì BÁO LỖI thay vì âm thầm mã hoá lại.
+  mode: auto
+
+  video_codec: libx264
+  crf: 20                        # nhỏ hơn = nét hơn, file to hơn. 18-23 là khoảng dùng được.
+  preset: medium                 # ultrafast..veryslow -- chậm hơn = file nhỏ hơn cùng chất lượng
+  pix_fmt: yuv420p               # để mọi trình phát đều đọc được
+
+  # keep  = giữ tiếng. Clip nào không có tiếng được chèn khoảng lặng, vì bộ ghép
+  #         của ffmpeg đòi mọi đoạn phải có cùng bộ luồng.
+  # strip = bỏ hẳn tiếng.
+  audio: keep
+  audio_codec: aac
+  audio_bitrate: "192k"
+  audio_sample_rate: 48000
+  audio_channels: 2
+
+# --- File đích ----------------------------------------------------------------
+output:
+  # Biến dùng được: {date} {run_id} {count}
+  path: "output/export/final_{date}.mp4"
+
+  # File đích đã tồn tại thì:
+  #   suffix    = thêm _02, _03... KHÔNG mất dữ liệu cũ (mặc định)
+  #   overwrite = ghi đè
+  #   error     = dừng và báo lỗi
+  on_exists: suffix
+
+  keep_temp: false               # true = giữ file tạm đã chuẩn hoá để soi
+  temp_dir: output/export/_temp
+
+# --- ffmpeg -------------------------------------------------------------------
+ffmpeg:
+  binary: ffmpeg                 # tên lệnh trong PATH, hoặc đường dẫn đầy đủ
+  ffprobe_binary: ffprobe
+  timeout_s: 3600
+  log_command: true              # ghi nguyên lệnh vào log -- chép ra chạy tay được
+
+# Số clip tối thiểu để chạy. Ít hơn -> bỏ qua, không coi là lỗi.
+min_clips: 1

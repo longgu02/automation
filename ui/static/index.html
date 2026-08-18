@@ -1,0 +1,965 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sơ đồ module — Automation</title>
+<style>
+/* ==========================================================================
+   Bảng màu. Định nghĩa đầy đủ ở :root (sáng), rồi ghi đè cho nền tối.
+   ========================================================================== */
+:root {
+  --bg:        #f1f3f7;
+  --panel:     #ffffff;
+  --panel-2:   #f7f8fb;
+  --ink:       #16181d;
+  --ink-soft:  #5b6270;
+  --line:      #d9dde5;
+  --line-soft: #e8ebf0;
+  --accent:    #4f46e5;
+  --ok:        #059669;
+  --warn:      #b45309;
+  --danger:    #dc2626;
+  --grid:      #e2e6ee;
+  --shadow:    0 1px 2px rgba(16,24,40,.06), 0 8px 24px rgba(16,24,40,.08);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:        #0f1116;
+    --panel:     #171a21;
+    --panel-2:   #1d212a;
+    --ink:       #e7e9ee;
+    --ink-soft:  #979eae;
+    --line:      #2b3039;
+    --line-soft: #232830;
+    --accent:    #818cf8;
+    --ok:        #34d399;
+    --warn:      #fbbf24;
+    --danger:    #f87171;
+    --grid:      #1b1f27;
+    --shadow:    0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.5 "Segoe UI", system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+}
+button, input, select { font: inherit; color: inherit; }
+
+/* ==========================================================================
+   Bố cục: thanh trên + ba cột
+   ========================================================================== */
+#app { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+#main { display: grid; grid-template-columns: 232px 1fr 300px; min-height: 0; }
+
+#topbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 14px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+#topbar .title { font-weight: 650; letter-spacing: -.01em; margin-right: 4px; }
+#topbar .spacer { flex: 1; }
+
+.panel { background: var(--panel); overflow-y: auto; }
+#palette { border-right: 1px solid var(--line); }
+#inspector { border-left: 1px solid var(--line); }
+.panel h2 {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--ink-soft); margin: 16px 14px 8px; font-weight: 650;
+}
+
+/* ------------------------------------------------------------ điều khiển */
+button {
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 7px; padding: 6px 11px; cursor: pointer;
+  transition: background .12s, border-color .12s;
+}
+button:hover { background: var(--line-soft); border-color: var(--ink-soft); }
+button:active { transform: translateY(1px); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primary:hover { filter: brightness(1.08); }
+button.danger { color: var(--danger); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+
+input[type=text], input[type=number], select {
+  background: var(--bg); border: 1px solid var(--line);
+  border-radius: 6px; padding: 5px 8px; width: 100%;
+}
+input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+label.row { display: block; margin: 0 14px 10px; }
+label.row > span {
+  display: block; font-size: 11px; color: var(--ink-soft);
+  margin-bottom: 3px; text-transform: uppercase; letter-spacing: .05em;
+}
+
+/* ---------------------------------------------------------- bảng module */
+.mod {
+  display: flex; gap: 9px; align-items: flex-start;
+  margin: 0 10px 7px; padding: 9px 10px;
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-left: 3px solid var(--mod-accent, var(--accent));
+  border-radius: 8px; cursor: grab; user-select: none;
+}
+.mod:hover { background: var(--line-soft); }
+.mod:active { cursor: grabbing; }
+.mod .ico { font-size: 17px; line-height: 1.2; }
+.mod .nm { font-weight: 600; font-size: 13px; }
+.mod .ds { font-size: 11.5px; color: var(--ink-soft); margin-top: 2px; }
+
+.hint {
+  margin: 8px 14px 16px; padding: 9px 11px;
+  background: var(--panel-2); border: 1px dashed var(--line);
+  border-radius: 8px; font-size: 11.5px; color: var(--ink-soft);
+}
+
+/* -------------------------------------------------------------- khung vẽ */
+#canvas-wrap {
+  position: relative; overflow: hidden; min-width: 0;
+  background:
+    linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 22px 22px,
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 22px 22px,
+    var(--bg);
+  cursor: grab;
+}
+#canvas-wrap.panning { cursor: grabbing; }
+#canvas-wrap.linking { cursor: crosshair; }
+#world { position: absolute; inset: 0; transform-origin: 0 0; }
+#edges { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+#edges path { pointer-events: stroke; cursor: pointer; }
+
+.node {
+  position: absolute; width: 218px;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 10px; box-shadow: var(--shadow);
+  user-select: none;
+}
+.node.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
+.node.disabled { opacity: .45; }
+.node .head {
+  display: flex; align-items: center; gap: 7px;
+  padding: 8px 10px; cursor: move;
+  border-bottom: 1px solid var(--line-soft);
+  border-left: 3px solid var(--node-accent, var(--accent));
+  border-radius: 9px 9px 0 0;
+}
+.node .head .ico { font-size: 15px; }
+.node .head .nm {
+  font-weight: 600; font-size: 13px; flex: 1;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.node .body { padding: 7px 10px 9px; font-size: 11.5px; color: var(--ink-soft); }
+.node .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.tag {
+  font-size: 10px; padding: 1px 6px; border-radius: 20px;
+  border: 1px solid var(--line); background: var(--panel-2);
+}
+.tag.in  { color: var(--ok); }
+.tag.out { color: var(--accent); }
+
+/* Cổng nối. Nằm giữa chiều cao phần tiêu đề. */
+.port {
+  position: absolute; top: 19px; width: 13px; height: 13px;
+  background: var(--panel); border: 2px solid var(--ink-soft);
+  border-radius: 50%; cursor: crosshair; z-index: 2;
+}
+.port:hover, .port.hot { background: var(--accent); border-color: var(--accent); transform: scale(1.35); }
+.port.inp { left: -7px; }
+.port.out { right: -7px; }
+
+/* ------------------------------------------------------------- thanh phải */
+.field { margin: 0 14px 9px; }
+.field .lbl { font-size: 11px; color: var(--ink-soft); margin-bottom: 3px; }
+.ov {
+  display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center;
+  margin: 0 14px 6px;
+}
+.ov .k { font-size: 10.5px; color: var(--ink-soft); grid-column: 1 / -1; margin-bottom: -3px; }
+.warn-box {
+  margin: 8px 14px; padding: 8px 10px; border-radius: 7px; font-size: 11.5px;
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+  color: var(--warn);
+}
+.empty { margin: 20px 14px; color: var(--ink-soft); font-size: 12.5px; }
+
+/* --------------------------------------------------------------- bảng log */
+#console {
+  position: absolute; left: 0; right: 0; bottom: 0; max-height: 46%;
+  background: var(--panel); border-top: 1px solid var(--line);
+  display: none; flex-direction: column;
+}
+#console.open { display: flex; }
+#console .bar {
+  display: flex; align-items: center; gap: 8px; padding: 6px 12px;
+  border-bottom: 1px solid var(--line-soft); font-size: 12px;
+}
+#console pre {
+  margin: 0; padding: 10px 12px; overflow: auto; flex: 1;
+  font: 12px/1.55 "Cascadia Mono", Consolas, monospace; white-space: pre-wrap;
+}
+.pill { font-size: 11px; padding: 2px 8px; border-radius: 20px; border: 1px solid var(--line); }
+.pill.ok { color: var(--ok); border-color: currentColor; }
+.pill.bad { color: var(--danger); border-color: currentColor; }
+.pill.warn { color: var(--warn); border-color: currentColor; }
+
+#ghost {
+  position: fixed; pointer-events: none; z-index: 99; opacity: .85;
+  padding: 8px 12px; border-radius: 8px; background: var(--panel);
+  border: 1px solid var(--accent); box-shadow: var(--shadow); font-size: 13px;
+  display: none;
+}
+#toast {
+  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+  background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow);
+  padding: 9px 16px; border-radius: 9px; z-index: 100; display: none; font-size: 13px;
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <span class="title">Sơ đồ module</span>
+    <input type="text" id="jobName" style="width:190px" placeholder="tên-job" value="job-moi">
+    <select id="jobList" style="width:180px"><option value="">— mở job đã lưu —</option></select>
+    <button id="btnLoad">Mở</button>
+    <button id="btnSave" class="primary">Lưu</button>
+    <span class="spacer"></span>
+    <span id="stat" style="color:var(--ink-soft);font-size:12px"></span>
+    <button id="btnValidate">Kiểm tra</button>
+    <button id="btnDry">Chạy thử</button>
+    <button id="btnFit">Vừa khung</button>
+    <button id="btnClear" class="danger">Xoá hết</button>
+  </div>
+
+  <div id="main">
+    <!-- ================= Bảng module ================= -->
+    <div class="panel" id="palette">
+      <h2>Module có sẵn</h2>
+      <div id="modList"></div>
+      <div class="hint">
+        <b>Kéo</b> một module vào khung để thêm.<br>
+        <b>Kéo từ chấm phải sang chấm trái</b> của nút khác để nối.<br>
+        <b>Delete</b> để xoá thứ đang chọn.<br>
+        Lăn chuột để phóng to/thu nhỏ, kéo nền để di chuyển.
+      </div>
+      <h2>Cạnh nghĩa là gì</h2>
+      <div class="hint">
+        Cạnh chỉ quy định <b>thứ tự chạy</b> ("chạy sau").<br>
+        Dữ liệu đi riêng qua các khoá chung — thẻ
+        <span class="tag in">vào</span> và <span class="tag out">ra</span>
+        trên mỗi nút cho biết nó đọc/ghi khoá nào.
+      </div>
+    </div>
+
+    <!-- ================= Khung vẽ ================= -->
+    <div id="canvas-wrap">
+      <div id="world">
+        <svg id="edges"></svg>
+        <div id="nodes"></div>
+      </div>
+      <div id="console">
+        <div class="bar">
+          <b>Kết quả</b><span id="conState"></span><span class="spacer" style="flex:1"></span>
+          <button id="btnCloseCon">Đóng</button>
+        </div>
+        <pre id="conText"></pre>
+      </div>
+    </div>
+
+    <!-- ================= Thanh chi tiết ================= -->
+    <div class="panel" id="inspector">
+      <h2>Chi tiết</h2>
+      <div id="inspectorBody"><div class="empty">Chọn một nút để xem và chỉnh tham số.</div></div>
+    </div>
+  </div>
+</div>
+
+<div id="ghost"></div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* ==========================================================================
+   TRẠNG THÁI
+   Một đối tượng duy nhất. Mọi thao tác sửa nó rồi gọi render().
+   Không có framework, nên quy tắc này là thứ giữ cho mọi thứ không rối.
+   ========================================================================== */
+const S = {
+  modules: [],        // danh mục lấy từ /api/modules
+  nodes: [],          // {id, module, label, config_file, overrides, enabled, position}
+  edges: [],          // {source, target}
+  sel: null,          // {kind:'node'|'edge', id} — thứ đang chọn
+  pan: {x: 120, y: 90},
+  zoom: 1,
+  drag: null,         // thao tác kéo đang diễn ra
+  seq: 1,             // bộ đếm sinh id nút
+};
+
+const $ = (id) => document.getElementById(id);
+const wrap = $("canvas-wrap"), world = $("world"), svg = $("edges"), nodesEl = $("nodes");
+
+const NODE_W = 218;      // phải khớp .node width trong CSS
+const PORT_Y = 25;       // tâm cổng, tính từ đỉnh nút — khớp .port top
+
+/* ==========================================================================
+   TIỆN ÍCH
+   ========================================================================== */
+function toast(msg, ms = 2600) {
+  const el = $("toast");
+  el.textContent = msg;
+  el.style.display = "block";
+  clearTimeout(el._t);
+  el._t = setTimeout(() => (el.style.display = "none"), ms);
+}
+
+async function api(path, options) {
+  const res = await fetch(path, options);
+  const data = await res.json().catch(() => ({ok: false, error: "Phản hồi không phải JSON"}));
+  if (!res.ok && data.error) throw new Error(data.error);
+  return data;
+}
+
+/** Đổi toạ độ trên màn hình sang toạ độ trong sơ đồ. */
+function toWorld(clientX, clientY) {
+  const r = wrap.getBoundingClientRect();
+  return {
+    x: (clientX - r.left - S.pan.x) / S.zoom,
+    y: (clientY - r.top - S.pan.y) / S.zoom,
+  };
+}
+
+const findModule = (name) => S.modules.find((m) => m.name === name);
+const findNode = (id) => S.nodes.find((n) => n.id === id);
+
+function newId(moduleName) {
+  let id;
+  do { id = `${moduleName}_${S.seq++}`; } while (findNode(id));
+  return id;
+}
+
+/* ==========================================================================
+   VẼ
+   ========================================================================== */
+function render() {
+  world.style.transform = `translate(${S.pan.x}px, ${S.pan.y}px) scale(${S.zoom})`;
+  renderNodes();
+  renderEdges();
+  renderInspector();
+  $("stat").textContent = `${S.nodes.length} nút · ${S.edges.length} cạnh`;
+}
+
+function renderNodes() {
+  nodesEl.textContent = "";
+  for (const node of S.nodes) {
+    const mod = findModule(node.module);
+    const el = document.createElement("div");
+    el.className = "node"
+      + (S.sel?.kind === "node" && S.sel.id === node.id ? " selected" : "")
+      + (node.enabled === false ? " disabled" : "");
+    el.style.left = node.position.x + "px";
+    el.style.top = node.position.y + "px";
+    el.style.setProperty("--node-accent", mod?.accent || "#888");
+    el.dataset.id = node.id;
+
+    // --- tiêu đề (cũng là tay cầm để kéo) ---
+    const head = document.createElement("div");
+    head.className = "head";
+    const ico = document.createElement("span");
+    ico.className = "ico"; ico.textContent = mod?.icon || "▦";
+    const nm = document.createElement("span");
+    nm.className = "nm"; nm.textContent = node.label || mod?.title || node.module;
+    head.append(ico, nm);
+
+    // --- thân: tên module + thẻ vào/ra ---
+    const body = document.createElement("div");
+    body.className = "body";
+    const sub = document.createElement("div");
+    sub.textContent = node.module;
+    body.append(sub);
+
+    const tags = document.createElement("div");
+    tags.className = "tags";
+    for (const key of (mod?.reads || [])) tags.append(tag("in", "vào: " + key));
+    for (const key of (mod?.writes || [])) tags.append(tag("out", "ra: " + key));
+    const count = Object.keys(node.overrides || {}).length;
+    if (count) tags.append(tag("", `${count} ghi đè`));
+    body.append(tags);
+
+    // --- hai cổng nối ---
+    const pin = document.createElement("div");
+    pin.className = "port inp"; pin.dataset.port = "in"; pin.title = "Cổng vào — thả cạnh vào đây";
+    const pout = document.createElement("div");
+    pout.className = "port out"; pout.dataset.port = "out"; pout.title = "Cổng ra — kéo từ đây để nối";
+
+    el.append(head, body, pin, pout);
+    nodesEl.append(el);
+  }
+}
+
+function tag(kind, text) {
+  const el = document.createElement("span");
+  el.className = "tag " + kind;
+  el.textContent = text;
+  return el;
+}
+
+/** Toạ độ cổng của một nút, trong hệ toạ độ sơ đồ. */
+function portPos(node, side) {
+  return {
+    x: node.position.x + (side === "out" ? NODE_W : 0),
+    y: node.position.y + PORT_Y,
+  };
+}
+
+function renderEdges() {
+  svg.textContent = "";
+  for (const [index, edge] of S.edges.entries()) {
+    const a = findNode(edge.source), b = findNode(edge.target);
+    if (!a || !b) continue;
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    const selected = S.sel?.kind === "edge" && S.sel.id === index;
+    path.setAttribute("d", curve(portPos(a, "out"), portPos(b, "in")));
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", selected ? "var(--accent)" : "var(--ink-soft)");
+    path.setAttribute("stroke-width", selected ? 2.6 : 1.8);
+    path.dataset.index = index;
+    svg.append(path);
+  }
+  if (S.drag?.kind === "link" && S.drag.to) {
+    const from = portPos(findNode(S.drag.from), "out");
+    const temp = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    temp.setAttribute("d", curve(from, S.drag.to));
+    temp.setAttribute("fill", "none");
+    temp.setAttribute("stroke", "var(--accent)");
+    temp.setAttribute("stroke-width", 2);
+    temp.setAttribute("stroke-dasharray", "5 4");
+    svg.append(temp);
+  }
+}
+
+/** Đường cong Bezier ngang — dễ đọc hơn đường thẳng khi nhiều cạnh chồng nhau. */
+function curve(a, b) {
+  const grip = Math.max(45, Math.abs(b.x - a.x) * 0.45);
+  return `M ${a.x} ${a.y} C ${a.x + grip} ${a.y}, ${b.x - grip} ${b.y}, ${b.x} ${b.y}`;
+}
+
+/* ==========================================================================
+   THANH CHI TIẾT
+   ========================================================================== */
+function renderInspector() {
+  const box = $("inspectorBody");
+  box.textContent = "";
+
+  if (S.sel?.kind === "edge") {
+    const edge = S.edges[S.sel.id];
+    if (edge) {
+      box.append(para(`Cạnh: ${edge.source} → ${edge.target}`));
+      box.append(para("Nghĩa là: nút sau chạy sau khi nút trước xong."));
+      box.append(actionButton("Xoá cạnh này", "danger", () => { S.edges.splice(S.sel.id, 1); S.sel = null; render(); }));
+    }
+    return;
+  }
+
+  if (S.sel?.kind !== "node") {
+    box.innerHTML = '<div class="empty">Chọn một nút để xem và chỉnh tham số.</div>';
+    return;
+  }
+
+  const node = findNode(S.sel.id);
+  if (!node) { S.sel = null; return; }
+  const mod = findModule(node.module);
+
+  if (mod?.warning) {
+    const w = document.createElement("div");
+    w.className = "warn-box";
+    w.textContent = "⚠ " + mod.warning;
+    box.append(w);
+  }
+
+  box.append(textField("Nhãn hiển thị", node.label || "", (v) => { node.label = v; render(); }));
+  box.append(textField("File cấu hình", node.config_file || "",
+    (v) => { node.config_file = v.trim() || null; },
+    mod?.default_config_file || ""));
+
+  // Bật/tắt nút mà không phải xoá nó khỏi sơ đồ.
+  const toggle = document.createElement("div");
+  toggle.className = "field";
+  const cb = document.createElement("input");
+  cb.type = "checkbox"; cb.checked = node.enabled !== false;
+  cb.style.width = "auto";
+  cb.onchange = () => { node.enabled = cb.checked; render(); };
+  const lab = document.createElement("label");
+  lab.style.cssText = "display:flex;gap:7px;align-items:center;cursor:pointer";
+  lab.append(cb, document.createTextNode("Bật nút này"));
+  toggle.append(lab);
+  box.append(toggle);
+
+  // ---- Ghi đè tham số -------------------------------------------------
+  const heading = document.createElement("h2");
+  heading.textContent = "Ghi đè tham số";
+  box.append(heading);
+
+  const fields = mod?.fields || [];
+  if (!fields.length) {
+    box.append(para("Module này không có tham số vô hướng nào chỉnh được ở đây. Sửa trực tiếp trong file YAML."));
+  } else {
+    const picker = document.createElement("div");
+    picker.className = "ov";
+    const select = document.createElement("select");
+    select.append(new Option("— chọn tham số để ghi đè —", ""));
+    for (const f of fields) {
+      if (node.overrides && f.path in node.overrides) continue;
+      select.append(new Option(f.path, f.path));
+    }
+    const add = document.createElement("button");
+    add.textContent = "Thêm";
+    add.onclick = () => {
+      const path = select.value;
+      if (!path) return;
+      const field = fields.find((f) => f.path === path);
+      node.overrides = node.overrides || {};
+      node.overrides[path] = field.default ?? (field.type === "checkbox" ? false : "");
+      render();
+    };
+    picker.append(select, add);
+    box.append(picker);
+  }
+
+  for (const [path, value] of Object.entries(node.overrides || {})) {
+    box.append(overrideRow(node, path, value, fields.find((f) => f.path === path)));
+  }
+
+  box.append(actionButton("Xoá nút này", "danger", () => {
+    S.edges = S.edges.filter((e) => e.source !== node.id && e.target !== node.id);
+    S.nodes = S.nodes.filter((n) => n.id !== node.id);
+    S.sel = null;
+    render();
+  }));
+}
+
+function overrideRow(node, path, value, field) {
+  const box = document.createElement("div");
+  box.className = "ov";
+
+  const key = document.createElement("div");
+  key.className = "k";
+  key.textContent = path + (field?.help ? " — " + field.help : "");
+  box.append(key);
+
+  let input;
+  if (field?.type === "select") {
+    input = document.createElement("select");
+    for (const choice of field.choices) input.append(new Option(choice, choice));
+    input.value = String(value);
+    input.onchange = () => { node.overrides[path] = input.value; };
+  } else if (field?.type === "checkbox") {
+    input = document.createElement("select");
+    input.append(new Option("true", "true"), new Option("false", "false"));
+    input.value = String(!!value);
+    input.onchange = () => { node.overrides[path] = input.value === "true"; };
+  } else {
+    input = document.createElement("input");
+    input.type = field?.type === "number" ? "number" : "text";
+    input.value = value ?? "";
+    input.onchange = () => {
+      const raw = input.value;
+      node.overrides[path] = field?.type === "number" && raw !== "" ? Number(raw) : raw;
+    };
+  }
+  const remove = document.createElement("button");
+  remove.textContent = "✕"; remove.title = "Bỏ ghi đè này";
+  remove.onclick = () => { delete node.overrides[path]; render(); };
+
+  box.append(input, remove);
+  return box;
+}
+
+function textField(label, value, onChange, placeholder = "") {
+  const box = document.createElement("div");
+  box.className = "field";
+  const lbl = document.createElement("div");
+  lbl.className = "lbl"; lbl.textContent = label;
+  const input = document.createElement("input");
+  input.type = "text"; input.value = value; input.placeholder = placeholder;
+  input.onchange = () => onChange(input.value);
+  box.append(lbl, input);
+  return box;
+}
+
+function para(text) {
+  const p = document.createElement("div");
+  p.className = "empty";
+  p.textContent = text;
+  return p;
+}
+
+function actionButton(text, cls, onClick) {
+  const box = document.createElement("div");
+  box.className = "field";
+  box.style.marginTop = "14px";
+  const b = document.createElement("button");
+  b.className = cls; b.textContent = text; b.onclick = onClick;
+  box.append(b);
+  return box;
+}
+
+/* ==========================================================================
+   TƯƠNG TÁC CHUỘT
+   Một mô hình duy nhất: mousedown ghi lại ý định vào S.drag, mousemove cập
+   nhật, mouseup kết thúc. Không dùng HTML5 drag-and-drop để tránh trộn hai
+   cơ chế khác nhau trong cùng một khung.
+   ========================================================================== */
+wrap.addEventListener("mousedown", (ev) => {
+  const port = ev.target.closest(".port");
+  const nodeEl = ev.target.closest(".node");
+  const edgePath = ev.target.closest("path[data-index]");
+
+  if (port && nodeEl) {
+    // Bắt đầu nối. Chỉ cho kéo TỪ cổng ra, để hướng cạnh luôn rõ ràng.
+    if (port.dataset.port === "out") {
+      S.drag = {kind: "link", from: nodeEl.dataset.id, to: toWorld(ev.clientX, ev.clientY)};
+      wrap.classList.add("linking");
+    }
+    ev.preventDefault();
+    return;
+  }
+
+  if (nodeEl) {
+    const node = findNode(nodeEl.dataset.id);
+    S.sel = {kind: "node", id: node.id};
+    if (ev.target.closest(".head")) {
+      const point = toWorld(ev.clientX, ev.clientY);
+      S.drag = {kind: "move", id: node.id, dx: point.x - node.position.x, dy: point.y - node.position.y};
+    }
+    render();
+    ev.preventDefault();
+    return;
+  }
+
+  if (edgePath) {
+    S.sel = {kind: "edge", id: Number(edgePath.dataset.index)};
+    render();
+    return;
+  }
+
+  // Nền trống -> bỏ chọn và bắt đầu di chuyển khung.
+  S.sel = null;
+  S.drag = {kind: "pan", x: ev.clientX - S.pan.x, y: ev.clientY - S.pan.y};
+  wrap.classList.add("panning");
+  render();
+});
+
+window.addEventListener("mousemove", (ev) => {
+  if (!S.drag) return;
+
+  if (S.drag.kind === "pan") {
+    S.pan = {x: ev.clientX - S.drag.x, y: ev.clientY - S.drag.y};
+    world.style.transform = `translate(${S.pan.x}px, ${S.pan.y}px) scale(${S.zoom})`;
+    return;
+  }
+  if (S.drag.kind === "move") {
+    const point = toWorld(ev.clientX, ev.clientY);
+    const node = findNode(S.drag.id);
+    node.position.x = Math.round(point.x - S.drag.dx);
+    node.position.y = Math.round(point.y - S.drag.dy);
+    renderNodes(); renderEdges();
+    return;
+  }
+  if (S.drag.kind === "link") {
+    S.drag.to = toWorld(ev.clientX, ev.clientY);
+    // Làm nổi cổng vào đang nhắm tới, để biết thả vào đâu.
+    document.querySelectorAll(".port.hot").forEach((p) => p.classList.remove("hot"));
+    const over = document.elementFromPoint(ev.clientX, ev.clientY)?.closest(".port.inp");
+    if (over) over.classList.add("hot");
+    renderEdges();
+    return;
+  }
+  if (S.drag.kind === "new") {
+    const ghost = $("ghost");
+    ghost.style.display = "block";
+    ghost.style.left = ev.clientX + 12 + "px";
+    ghost.style.top = ev.clientY + 12 + "px";
+  }
+});
+
+window.addEventListener("mouseup", (ev) => {
+  const drag = S.drag;
+  S.drag = null;
+  wrap.classList.remove("panning", "linking");
+  $("ghost").style.display = "none";
+  document.querySelectorAll(".port.hot").forEach((p) => p.classList.remove("hot"));
+  if (!drag) return;
+
+  if (drag.kind === "link") {
+    const target = document.elementFromPoint(ev.clientX, ev.clientY)?.closest(".node");
+    if (target && target.dataset.id !== drag.from) {
+      addEdge(drag.from, target.dataset.id);
+    }
+    render();
+  }
+
+  if (drag.kind === "new") {
+    const r = wrap.getBoundingClientRect();
+    const inside = ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom;
+    if (inside) {
+      const point = toWorld(ev.clientX, ev.clientY);
+      addNode(drag.module, point.x - NODE_W / 2, point.y - 20);
+    }
+  }
+});
+
+/** Thêm cạnh, chặn trùng lặp và chặn vòng lặp ngay lúc nối. */
+function addEdge(source, target) {
+  if (S.edges.some((e) => e.source === source && e.target === target)) {
+    toast("Hai nút này đã được nối rồi.");
+    return;
+  }
+  if (createsCycle(source, target)) {
+    toast("Không nối được: sẽ tạo thành vòng lặp.");
+    return;
+  }
+  S.edges.push({source, target});
+}
+
+/** Nối source→target có tạo vòng không? Tức là từ target có về được source không. */
+function createsCycle(source, target) {
+  const stack = [target], seen = new Set();
+  while (stack.length) {
+    const current = stack.pop();
+    if (current === source) return true;
+    if (seen.has(current)) continue;
+    seen.add(current);
+    for (const e of S.edges) if (e.source === current) stack.push(e.target);
+  }
+  return false;
+}
+
+function addNode(moduleName, x, y) {
+  const mod = findModule(moduleName);
+  const node = {
+    id: newId(moduleName),
+    module: moduleName,
+    label: mod?.title || moduleName,
+    config_file: null,
+    overrides: {},
+    enabled: true,
+    position: {x: Math.round(x), y: Math.round(y)},
+  };
+  S.nodes.push(node);
+  S.sel = {kind: "node", id: node.id};
+  render();
+}
+
+/* -------------------------------------------------------- phóng to / phím */
+wrap.addEventListener("wheel", (ev) => {
+  ev.preventDefault();
+  const factor = ev.deltaY < 0 ? 1.12 : 1 / 1.12;
+  const next = Math.min(2.2, Math.max(0.3, S.zoom * factor));
+  // Giữ nguyên điểm dưới con trỏ khi phóng to — nếu không sẽ trôi rất khó chịu.
+  const r = wrap.getBoundingClientRect();
+  const mx = ev.clientX - r.left, my = ev.clientY - r.top;
+  S.pan.x = mx - (mx - S.pan.x) * (next / S.zoom);
+  S.pan.y = my - (my - S.pan.y) * (next / S.zoom);
+  S.zoom = next;
+  render();
+}, {passive: false});
+
+window.addEventListener("keydown", (ev) => {
+  if (["INPUT", "SELECT", "TEXTAREA"].includes(ev.target.tagName)) return;
+  if (ev.key === "Delete" || ev.key === "Backspace") {
+    if (S.sel?.kind === "node") {
+      S.edges = S.edges.filter((e) => e.source !== S.sel.id && e.target !== S.sel.id);
+      S.nodes = S.nodes.filter((n) => n.id !== S.sel.id);
+    } else if (S.sel?.kind === "edge") {
+      S.edges.splice(S.sel.id, 1);
+    }
+    S.sel = null;
+    render();
+    ev.preventDefault();
+  }
+  if (ev.key === "Escape") { S.sel = null; render(); }
+});
+
+/* ==========================================================================
+   BỐ TRÍ TỰ ĐỘNG
+   ========================================================================== */
+function fitView() {
+  if (!S.nodes.length) { S.pan = {x: 120, y: 90}; S.zoom = 1; return render(); }
+  const xs = S.nodes.map((n) => n.position.x), ys = S.nodes.map((n) => n.position.y);
+  const minX = Math.min(...xs) - 40, maxX = Math.max(...xs) + NODE_W + 40;
+  const minY = Math.min(...ys) - 40, maxY = Math.max(...ys) + 150;
+  const r = wrap.getBoundingClientRect();
+  S.zoom = Math.min(1.4, Math.max(0.3, Math.min(r.width / (maxX - minX), r.height / (maxY - minY))));
+  S.pan.x = (r.width - (maxX - minX) * S.zoom) / 2 - minX * S.zoom;
+  S.pan.y = (r.height - (maxY - minY) * S.zoom) / 2 - minY * S.zoom;
+  render();
+}
+
+/* ==========================================================================
+   NÓI CHUYỆN VỚI MÁY CHỦ
+   ========================================================================== */
+const currentJob = () => ({
+  name: $("jobName").value.trim() || "job-khong-ten",
+  description: "",
+  nodes: S.nodes,
+  edges: S.edges,
+  continue_on_error: false,
+});
+
+function showConsole(text, state, cls) {
+  $("console").classList.add("open");
+  $("conText").textContent = text;
+  const badge = $("conState");
+  badge.className = "pill " + (cls || "");
+  badge.textContent = state;
+}
+
+$("btnCloseCon").onclick = () => $("console").classList.remove("open");
+
+$("btnSave").onclick = async () => {
+  const name = $("jobName").value.trim();
+  if (!name) return toast("Đặt tên cho job trước đã.");
+  try {
+    const res = await api(`/api/jobs/${encodeURIComponent(name)}`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({job: currentJob()}),
+    });
+    toast("Đã lưu: " + res.path);
+    await loadJobList();
+  } catch (err) { toast("Lưu hỏng: " + err.message, 5000); }
+};
+
+$("btnLoad").onclick = async () => {
+  const file = $("jobList").value;
+  if (!file) return toast("Chọn một job trong danh sách.");
+  try {
+    const res = await api(`/api/jobs/${encodeURIComponent(file)}`);
+    applyJob(res.job);
+    toast("Đã mở: " + file);
+  } catch (err) { toast("Mở hỏng: " + err.message, 5000); }
+};
+
+function applyJob(job) {
+  S.nodes = (job.nodes || []).map((n) => ({...n, overrides: n.overrides || {}, position: n.position || {x: 0, y: 0}}));
+  S.edges = job.edges || [];
+  S.sel = null;
+  $("jobName").value = job.name || "job-moi";
+  // Đẩy bộ đếm id lên quá số lớn nhất đang dùng, tránh trùng id khi thêm nút mới.
+  S.seq = 1 + S.nodes.reduce((max, n) => {
+    const m = /_(\d+)$/.exec(n.id);
+    return m ? Math.max(max, Number(m[1])) : max;
+  }, 0);
+  fitView();
+}
+
+$("btnValidate").onclick = async () => {
+  try {
+    const res = await api("/api/validate", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({job: currentJob()}),
+    });
+    if (!res.problems.length) {
+      showConsole("Sơ đồ hợp lệ.\n\nThứ tự chạy:\n  " + res.order.join("\n  ↓\n  "), "hợp lệ", "ok");
+    } else {
+      const blocking = res.problems.filter((p) => !p.startsWith("'"));
+      showConsole(res.problems.map((p) => "• " + p).join("\n"),
+        blocking.length ? "có lỗi" : "có cảnh báo", blocking.length ? "bad" : "warn");
+    }
+  } catch (err) { showConsole(err.message, "lỗi", "bad"); }
+};
+
+$("btnDry").onclick = async () => {
+  showConsole("Đang chạy thử...", "đang chạy", "warn");
+  try {
+    const res = await api("/api/dryrun", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({job: currentJob()}),
+    });
+    const name = $("jobName").value.trim() || "job";
+    const tip = `\n${"─".repeat(58)}\nChạy thật bằng dòng lệnh (nơi bạn thấy log trực tiếp và Ctrl+C được):\n`
+      + `    python scripts/run_job.py ${name}\n`;
+    showConsole((res.log || "(không có log)") + tip, res.ok ? "chạy thử xong" : "có lỗi", res.ok ? "ok" : "bad");
+  } catch (err) { showConsole(err.message, "lỗi", "bad"); }
+};
+
+$("btnFit").onclick = fitView;
+
+$("btnClear").onclick = () => {
+  if (!S.nodes.length || confirm("Xoá toàn bộ nút và cạnh trên sơ đồ?")) {
+    S.nodes = []; S.edges = []; S.sel = null; render();
+  }
+};
+
+async function loadJobList() {
+  try {
+    const res = await api("/api/jobs");
+    const select = $("jobList");
+    const keep = select.value;
+    select.textContent = "";
+    select.append(new Option("— mở job đã lưu —", ""));
+    for (const job of res.jobs) {
+      select.append(new Option(`${job.file} (${job.nodes} nút)`, job.file));
+    }
+    select.value = keep;
+  } catch { /* không có job nào cũng không sao */ }
+}
+
+/* ==========================================================================
+   KHỞI ĐỘNG
+   ========================================================================== */
+async function boot() {
+  const res = await api("/api/modules");
+  S.modules = res.modules;
+
+  const list = $("modList");
+  for (const mod of S.modules) {
+    const el = document.createElement("div");
+    el.className = "mod";
+    el.style.setProperty("--mod-accent", mod.accent);
+    const ico = document.createElement("div");
+    ico.className = "ico"; ico.textContent = mod.icon;
+    const text = document.createElement("div");
+    const nm = document.createElement("div");
+    nm.className = "nm"; nm.textContent = mod.title;
+    const ds = document.createElement("div");
+    ds.className = "ds"; ds.textContent = mod.description;
+    text.append(nm, ds);
+    el.append(ico, text);
+
+    el.addEventListener("mousedown", (ev) => {
+      S.drag = {kind: "new", module: mod.name};
+      const ghost = $("ghost");
+      ghost.textContent = mod.icon + "  " + mod.title;
+      ghost.style.display = "block";
+      ghost.style.left = ev.clientX + 12 + "px";
+      ghost.style.top = ev.clientY + 12 + "px";
+      ev.preventDefault();
+    });
+    list.append(el);
+  }
+
+  await loadJobList();
+  render();
+}
+
+boot().catch((err) => {
+  document.body.innerHTML =
+    `<div style="padding:40px;font-family:system-ui">
+       <h2>Không nạp được danh mục module</h2>
+       <pre>${err.message}</pre>
+       <p>Máy chủ còn chạy không? Khởi động lại bằng: <code>python scripts/run_ui.py</code></p>
+     </div>`;
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+# =============================================================================
+# Job mẫu -- sinh video rồi ghép thành một file
+#
+# File này thường do giao diện sơ đồ ghi ra (python scripts/run_ui.py), nhưng
+# sửa tay cũng hoàn toàn được -- nó chỉ là YAML.
+#
+# Chạy:
+#     python scripts/run_job.py demo --dry-run
+#     python scripts/run_job.py demo
+#
+# `edges` chỉ quy định THỨ TỰ chạy ("chạy sau"). Dữ liệu đi riêng qua ctx.shared:
+# video_gen ghi khoá `videos`, video_export đọc khoá đó.
+# =============================================================================
+
+name: demo
+description: Sinh 3 video từ bộ prompt mẫu rồi ghép thành một file 16:9
+
+nodes:
+  - id: video_gen_1
+    module: video_gen
+    label: Sinh video
+    config_file: config/video_gen.yaml
+    overrides: {}
+    enabled: true
+    position: {x: 80, y: 120}
+
+  - id: video_export_1
+    module: video_export
+    label: Ghép thành 1 file
+    config_file: config/video_export.yaml
+    # Khoá ghi đè dùng dấu chấm, ứng với cấu trúc trong file cấu hình.
+    overrides:
+      video.target_aspect_ratio: "16:9"
+      video.target_resolution: 1080p
+    enabled: true
+    position: {x: 420, y: 120}
+
+edges:
+  - {source: video_gen_1, target: video_export_1}
+
+# false = một module hỏng thì dừng cả job.
+continue_on_error: false

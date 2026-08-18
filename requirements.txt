@@ -1,0 +1,29 @@
+# Phụ thuộc được giữ ở mức tối thiểu có chủ đích -- mỗi thư viện thêm vào là
+# thêm một thứ có thể hỏng khi nâng cấp. Retry và cấu hình đều tự viết trong
+# core/ vì chúng ngắn và cần đọc hiểu được ngay.
+
+# --- Bắt buộc ---------------------------------------------------------------
+pydantic>=2.9          # hợp đồng cấu hình, bắt lỗi ngay lúc nạp
+PyYAML>=6.0            # định dạng của config và prompt
+python-dotenv>=1.0     # đọc secret từ .env
+
+# --- Backend flow_browser ---------------------------------------------------
+# Sau khi pip install, nhớ chạy thêm:  playwright install chromium
+playwright>=1.48
+
+# --- Backend gemini_api (tuỳ chọn) ------------------------------------------
+# Chỉ cần khi bạn chuyển sang backend: gemini_api. Xoá dòng này nếu không dùng.
+google-genai>=1.0
+
+# --- Module video_export ----------------------------------------------------
+# KHÔNG có gói pip nào ở đây: module này gọi ffmpeg/ffprobe như chương trình
+# ngoài, cố ý không dùng thư viện bọc. Lý do: ffmpeg bản gốc luôn mới nhất và
+# ổn định nhất, còn các lớp bọc Python thường chậm cập nhật và che mất thông
+# báo lỗi thật của ffmpeg -- thứ quan trọng nhất khi gỡ rối.
+#
+#     winget install Gyan.FFmpeg
+#
+# Kiểm tra:  ffmpeg -version
+
+# --- Kiểm thử (tuỳ chọn) ----------------------------------------------------
+pytest>=8.0

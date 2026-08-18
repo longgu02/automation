@@ -1,0 +1,87 @@
+# =============================================================================
+# Cấu hình module image_crawl -- lấy ảnh nổi bật từ Pinterest
+#
+# Hợp đồng của file này ở modules/image_crawl/config.py.
+#
+# Xem trước mà không mở trình duyệt:
+#     python scripts/run_image_crawl.py --dry-run
+#
+# HAI ĐIỀU CẦN BIẾT TRƯỚC KHI DÙNG:
+#
+#  1. Pinterest KHÔNG phải lúc nào cũng trả về số lượt lưu. Có thì module xếp
+#     hạng theo số đó; không có thì nó dùng thứ tự tìm kiếm của Pinterest và NÓI
+#     RÕ trong log lẫn file manifest.json. Đừng đọc kết quả là "top theo lượt
+#     thích" khi manifest ghi ranking_basis: search_order.
+#
+#  2. Ảnh tải về thuộc bản quyền người đăng. File manifest.json giữ đường dẫn
+#     tới pin gốc để bạn truy lại và ghi công.
+# =============================================================================
+
+search:
+  query: "minimalist interior design"
+  top_n: 10
+
+  # Cần gom bao nhiêu pin trước khi xếp hạng.
+  # Phải lớn hơn top_n KHÁ NHIỀU thì xếp hạng mới có ý nghĩa: chọn 10 trong 12
+  # gần như là lấy tất cả, chọn 10 trong 120 mới là chọn lọc.
+  candidate_pool: 120
+
+  # Trần số nhịp cuộn, phòng khi không bao giờ gom đủ candidate_pool.
+  max_scrolls: 40
+
+  url_template: "https://www.pinterest.com/search/pins/?q={query}&rs=typed"
+
+# --- Nhịp thao tác như người dùng ---------------------------------------------
+# Số NHỎ hơn = nhanh hơn = giống máy hơn = dễ bị chặn hơn.
+# Bộ mặc định là nhịp của một người đang lướt Pinterest bình thường.
+pacing:
+  min_action_delay_s: 1.5      # nghỉ giữa hai thao tác
+  max_action_delay_s: 4.0
+
+  min_scroll_px: 300           # mỗi nhịp cuộn bao nhiêu điểm ảnh
+  max_scroll_px: 800
+  min_scroll_pause_s: 0.8      # nghỉ sau mỗi nhịp cuộn
+  max_scroll_pause_s: 2.5
+
+  long_pause_every: 6          # cứ 6 nhịp thì dừng lâu một lần (0 = tắt)
+  min_long_pause_s: 4.0
+  max_long_pause_s: 10.0
+
+  backscroll_chance: 0.15      # xác suất cuộn ngược lên (người thật hay lướt quá rồi kéo lại)
+  mouse_moves: 3               # số nhịp rê chuột trước thao tác quan trọng
+
+  # Trần thời lượng một phiên. Cái phanh chống việc cấu hình sai biến thành
+  # phiên cào kéo dài hàng giờ mà bạn không để ý.
+  max_session_s: 900
+
+  seed: null                   # cố định một số để tái lập khi gỡ lỗi
+
+# --- Trình duyệt --------------------------------------------------------------
+browser:
+  # Profile riêng cho Pinterest, tách hẳn khỏi profile Google Flow.
+  profile_dir: .secrets/profiles/pinterest
+
+  browser_channel: chrome      # chrome | msedge | chromium
+  headless: false              # nên để false: chạy ẩn dễ bị nhận ra hơn, và bạn
+                               # cũng nên nhìn thấy nó làm gì trong vài lần đầu
+  viewport_width: 1440
+  viewport_height: 900
+  locale: "en-US"
+  page_timeout_ms: 45000
+  save_debug_artifacts: true
+
+# --- Tải ảnh ------------------------------------------------------------------
+download:
+  dest: output/image_crawl/{query_slug}
+
+  # Thứ tự ưu tiên kích thước. `orig` là bản gốc người đăng tải lên.
+  size_preference: ["orig", "originals", "736x", "564x"]
+
+  min_delay_s: 1.0             # nghỉ giữa hai lượt tải
+  max_delay_s: 3.0
+
+  timeout_ms: 30000
+  min_width: 200               # bỏ qua ảnh nhỏ hơn mức này (biểu tượng, avatar)
+
+  write_manifest: true         # ghi nguồn gốc từng ảnh -- nên để true
+  skip_existing: true          # file đã có thì không tải lại

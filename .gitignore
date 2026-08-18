@@ -1,0 +1,23 @@
+# --- Bí mật: TUYỆT ĐỐI không commit -----------------------------------------
+.env
+.secrets/
+# .secrets/browser_profile chứa cookie phiên Google đã đăng nhập.
+# Lộ ra ngoài đồng nghĩa với việc trao quyền truy cập tài khoản.
+
+# --- Kết quả sinh ra ---------------------------------------------------------
+output/
+logs/
+
+# --- Python ------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# --- Hệ điều hành / trình soạn thảo -----------------------------------------
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

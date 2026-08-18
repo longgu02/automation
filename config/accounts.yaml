@@ -1,0 +1,58 @@
+# =============================================================================
+# Danh sách tài khoản dùng để sinh video
+#
+# VÌ SAO CÓ FILE NÀY: nhiều tài khoản cho bạn hai thứ.
+#   1. Dự phòng  -- một tài khoản hết credit thì tự chuyển sang cái khác, prompt
+#                   đang dở được trả lại hàng đợi chứ không mất.
+#   2. Song song -- mỗi tài khoản là một hàng đợi render độc lập phía Google,
+#                   nên N tài khoản chạy được N prompt cùng lúc.
+#
+# QUY TẮC KHÔNG ĐƯỢC PHÁ: mỗi tài khoản PHẢI có `profile_dir` riêng. Chrome khoá
+# thư mục profile khi đang mở, và dùng chung thư mục nghĩa là dùng chung phiên
+# đăng nhập. Hệ thống sẽ báo lỗi ngay nếu bạn khai trùng.
+#
+# THÊM MỘT TÀI KHOẢN, ĐỦ BA BƯỚC:
+#   1. Bỏ ghi chú một khối bên dưới (hoặc thêm khối mới).
+#   2. python scripts/login_flow.py --account acc2
+#   3. Mở project trên Flow, chỉnh model/tỉ lệ, chép URL vào `workspace_url`.
+# =============================================================================
+
+accounts:
+  # -------------------------------------------------------------------------
+  # Tài khoản 1 -- trỏ vào profile bạn đã đăng nhập từ trước.
+  # ĐỪNG đổi profile_dir của khối này, nếu không bạn phải đăng nhập lại.
+  # -------------------------------------------------------------------------
+  - id: acc1
+    label: "tài khoản chính"
+    enabled: true
+    profile_dir: .secrets/browser_profile
+    # Bỏ trống -> dùng browser.workspace_url trong video_gen.yaml.
+    # Khi đã có project riêng cho từng tài khoản thì khai báo URL ở đây:
+    # workspace_url: "https://labs.google/fx/tools/flow/project/xxxxx"
+    notes: ""
+
+  # -------------------------------------------------------------------------
+  # Tài khoản 2 trở đi -- bỏ ghi chú để bật.
+  # Không khai profile_dir thì hệ thống tự dùng .secrets/profiles/<id>
+  # -------------------------------------------------------------------------
+  # - id: acc2
+  #   label: "tài khoản phụ 1"
+  #   enabled: true
+  #   workspace_url: "https://labs.google/fx/tools/flow/project/yyyyy"
+  #
+  # - id: acc3
+  #   label: "tài khoản phụ 2"
+  #   enabled: true
+  #   workspace_url: "https://labs.google/fx/tools/flow/project/zzzzz"
+
+  # -------------------------------------------------------------------------
+  # Với backend `gemini_api` thì "tài khoản" là một API key.
+  # Cùng cơ chế dự phòng và song song, chỉ khác trường khai báo.
+  # -------------------------------------------------------------------------
+  # - id: key1
+  #   label: "dự án AI Studio A"
+  #   api_key: "${GEMINI_API_KEY_1}"
+  #
+  # - id: key2
+  #   label: "dự án AI Studio B"
+  #   api_key: "${GEMINI_API_KEY_2}"

@@ -1,0 +1,47 @@
+# =============================================================================
+# Bộ prompt mẫu
+#
+# Thứ tự ưu tiên tham số (sau thắng trước):
+#   defaults trong video_gen.yaml  ->  defaults ở file này  ->  từng mục prompt
+#
+# Khoá dùng được trong mỗi mục: id, prompt, negative_prompt, model, aspect_ratio,
+# resolution, duration_seconds, outputs_per_prompt, seed, reference_image,
+# tags, notes.  Gõ sai tên khoá sẽ bị báo lỗi ngay, không bị bỏ qua âm thầm.
+#
+# `id` là định danh duy nhất, đồng thời là tên thư mục chứa kết quả:
+#   output/video_gen/<id>/<id>_01.mp4
+# ĐỔI id = mất dấu vết lần chạy trước = sinh lại từ đầu. Hãy giữ id ổn định.
+# =============================================================================
+
+defaults:
+  # Ghi đè riêng cho cả file này. Bỏ trống nếu muốn dùng mặc định toàn cục.
+  # Ví dụ để cả file này quay dọc cho TikTok/Shorts:
+  #   aspect_ratio: "9:16"
+  prompt_suffix: "cinematic lighting, shallow depth of field, 35mm film look"
+
+prompts:
+  - id: bien-hoang-hon
+    prompt: >
+      Aerial drone shot slowly descending toward waves breaking on black volcanic
+      rocks at sunset. Warm golden light rakes across the water, sea spray catches
+      the sun. Camera drifts forward and slightly down.
+    tags: [thien-nhien, mo-dau]
+    notes: "Cảnh mở đầu cho video du lịch."
+
+  - id: pho-dem-mua
+    prompt: >
+      Street level tracking shot through a narrow neon-lit alley during light rain
+      at night. Reflections shimmer on wet asphalt, steam rises from a food cart.
+      Camera moves forward steadily at walking pace.
+    negative_prompt: "text, watermark, distorted faces, blurry"
+    tags: [do-thi, dem]
+
+  - id: san-pham-xoay
+    prompt: >
+      Studio product shot of a matte ceramic coffee cup rotating slowly on a
+      seamless light grey backdrop. Soft key light from the left, subtle rim light.
+      Locked-off camera, no movement.
+    aspect_ratio: "1:1"      # ghi đè riêng cho prompt này
+    duration_seconds: 6
+    tags: [san-pham]
+    notes: "Tỉ lệ vuông để đăng feed Instagram."
